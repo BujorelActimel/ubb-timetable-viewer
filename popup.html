@@ -40,16 +40,6 @@
     .group-inputs > div {
       flex: 1;
     }
-    textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 13px;
-      font-family: inherit;
-      resize: vertical;
-      box-sizing: border-box;
-    }
     button {
       width: 100%;
       padding: 10px;
@@ -94,6 +84,135 @@
       color: #777;
       margin-top: 3px;
     }
+
+    /* Week toggle */
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .toggle-group label {
+      flex: 1;
+      margin: 0;
+      padding: 8px 0;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+      background: #fff;
+      border-right: 1px solid #ddd;
+      transition: background 0.15s, color 0.15s;
+    }
+    .toggle-group label:last-child {
+      border-right: none;
+    }
+    .toggle-group input[type="radio"] {
+      display: none;
+    }
+    .toggle-group input[type="radio"]:checked + label {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    /* Year tabs */
+    .year-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 8px;
+    }
+    .year-tabs button {
+      flex: 1;
+      margin: 0;
+      padding: 6px 0;
+      font-size: 12px;
+      border: 1px solid #ddd;
+      border-radius: 0;
+      background: #fff;
+      color: #555;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .year-tabs button:first-child {
+      border-radius: 4px 0 0 4px;
+    }
+    .year-tabs button:last-child {
+      border-radius: 0 4px 4px 0;
+    }
+    .year-tabs button.active {
+      background-color: #4CAF50;
+      color: white;
+      border-color: #4CAF50;
+    }
+    .year-tabs button.loading {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    /* Subject checklist */
+    .subject-list {
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 4px 0;
+    }
+    .subject-list label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      margin: 0;
+      cursor: pointer;
+      font-weight: normal;
+      font-size: 13px;
+      color: #333;
+    }
+    .subject-list label:hover {
+      background-color: #f5f5f5;
+    }
+    .subject-list input[type="checkbox"] {
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .subject-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .subject-controls a {
+      font-size: 11px;
+      color: #2196F3;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .subject-controls a:hover {
+      text-decoration: underline;
+    }
+    .year-heading {
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #eee;
+    }
+    .subject-loading {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
+    .subject-empty {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -120,9 +239,32 @@
   </div>
 
   <div class="section">
-    <label for="subjects">Subjects to Show (one per line):</label>
-    <textarea id="subjects" rows="6" placeholder="Fundamentele Programarii&#10;Structuri de Date&#10;Algebra&#10;..."></textarea>
-    <div class="help-text">Leave empty to show all subjects for your group</div>
+    <label>Week:</label>
+    <div class="toggle-group">
+      <input type="radio" name="week" id="weekAll" value="all">
+      <label for="weekAll">All</label>
+      <input type="radio" name="week" id="week1" value="1">
+      <label for="week1">Sapt. 1</label>
+      <input type="radio" name="week" id="week2" value="2">
+      <label for="week2">Sapt. 2</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <label>Subjects to Show:</label>
+    <div class="year-tabs">
+      <button type="button" data-year="1">Anul 1</button>
+      <button type="button" data-year="2">Anul 2</button>
+      <button type="button" data-year="3">Anul 3</button>
+    </div>
+    <div class="subject-controls">
+      <a id="selectAll">Select All</a>
+      <a id="deselectAll">Deselect All</a>
+    </div>
+    <div id="subjectList" class="subject-list">
+      <div class="subject-empty">Enter a timetable URL and click a year to load subjects</div>
+    </div>
+    <div class="help-text">Deselect all to show all subjects for your group</div>
   </div>
 
   <button id="saveBtn">Save Settings</button>
