@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Orarul meu</title>
+  <style>
+    * {
+      font-family: Tahoma, sans-serif;
+      font-size: 13px;
+      color: #1B1E1F;
+      line-height: 21px;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    table {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 {
+      color: #1B1E1F;
+      margin: 16px 0;
+      padding: 0;
+      font-family: Tahoma, Arial, Helvetica, Sans-serif;
+      font-size: 18px;
+      line-height: 18px;
+      font-weight: bold;
+    }
+    table {
+      border: 1px solid #AAAAAA !important;
+      border-collapse: collapse;
+      font-family: Tahoma, sans-serif;
+      font-size: 13px;
+      color: #1B1E1F;
+    }
+    table tr th {
+      border: 1px solid #AAAAAA !important;
+      background-color: #608ca4;
+      color: white;
+      padding-top: 2px;
+      padding-bottom: 2px;
+    }
+    table tr td, table tr th {
+      border: 1px solid #AAAAAA !important;
+      vertical-align: middle;
+      padding: 2px 4px;
+    }
+    th {
+      color: #ffffff;
+      background-color: #608ca4;
+    }
+    td.bloc {
+      background-color: #ffcccc;
+    }
+    a {
+      text-decoration: none;
+      background-color: transparent;
+      color: #003399;
+    }
+    a:hover {
+      background-color: #003399;
+      color: #f5f5ff;
+      text-decoration: none;
+    }
+    th a {
+      color: #ffffff;
+    }
+    th a:hover {
+      color: #445669;
+      background-color: #ffffff;
+    }
+
+    /* Week toggle - only custom addition */
+    .toolbar {
+      margin: 10px 0;
+    }
+    .toolbar button {
+      font-family: Tahoma, sans-serif;
+      font-size: 13px;
+      padding: 2px 10px;
+      cursor: pointer;
+      border: 1px solid #AAAAAA;
+      background: #fff;
+      color: #1B1E1F;
+    }
+    .toolbar button.active {
+      background-color: #608ca4;
+      color: #fff;
+      font-weight: bold;
+    }
+    .empty-state, .loading {
+      padding: 40px;
+      text-align: center;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+<center>
+  <h1>Orarul meu</h1>
+  <div class="toolbar">
+    <button id="weekAll" class="active">Toate</button>
+    <button id="week1">Sapt. 1</button>
+    <button id="week2">Sapt. 2</button>
+  </div>
+  <div id="content">
+    <div class="loading">Loading timetable...</div>
+  </div>
+</center>
+<script src="timetable.js"></script>
+</body>
+</html>

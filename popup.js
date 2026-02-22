@@ -1,298 +1,343 @@
-const DISCIPLINE_COLUMN_INDEX = 6;
-const YEARS = ["1", "2", "3"];
+// Column indices in the timetable HTML tables
+const COL = { DAY: 0, TIME: 1, FREQ: 2, ROOM: 3, FORMATIA: 4, TYPE: 5, SUBJECT: 6, PROF: 7 };
 
-let cachedSubjects = {}; // { year: [subjects] }
-let activeYears = new Set(); // which year tabs are toggled on
+const CATALOG = [
+  // Licenta
+  { section: "Licenta", name: "Matematica - romana", code: "M", years: [1,2,3] },
+  { section: "Licenta", name: "Informatica - romana", code: "I", years: [1,2,3] },
+  { section: "Licenta", name: "Mat-Info - romana", code: "MI", years: [1,2,3] },
+  { section: "Licenta", name: "Mat-Info 4 ani - romana", code: "MIDS", years: [1] },
+  { section: "Licenta", name: "Mat-Info - engleza", code: "MIE", years: [1,2,3] },
+  { section: "Licenta", name: "Matematica - maghiara", code: "MM", years: [1,2,3] },
+  { section: "Licenta", name: "Informatica - maghiara", code: "IM", years: [1,2,3] },
+  { section: "Licenta", name: "Mat-Info - maghiara", code: "MIM", years: [2,3] },
+  { section: "Licenta", name: "Ing. Informatiei - maghiara", code: "IIM", years: [1,2,3] },
+  { section: "Licenta", name: "Mat-Info 4 ani - maghiara", code: "MIMDS", years: [1] },
+  { section: "Licenta", name: "Informatica - germana", code: "IG", years: [1,2,3] },
+  { section: "Licenta", name: "Informatica - engleza", code: "IE", years: [1,2,3] },
+  { section: "Licenta", name: "Inteligenta Artificiala - engleza", code: "IA", years: [1,2,3] },
+  { section: "Licenta", name: "Ing. Informatiei - engleza", code: "II", years: [1,2,3] },
+  // Master
+  { section: "Master", name: "Metode moderne pred. matematicii", code: "MaMetModDid", years: [1,2] },
+  { section: "Master", name: "Matematici Avansate - engleza", code: "MaMAv", years: [1,2] },
+  { section: "Master", name: "Metode moderne pred. mat. - maghiara", code: "MaMetModDidm", years: [1,2] },
+  { section: "Master", name: "Baze de date", code: "MaBD", years: [1,2] },
+  { section: "Master", name: "Sisteme distribuite in Internet", code: "MaSD", years: [1,2] },
+  { section: "Master", name: "Inginerie software - engleza", code: "MaIS", years: [1,2] },
+  { section: "Master", name: "Inteligenta Computationala Aplicata - engleza", code: "MaICA", years: [1,2] },
+  { section: "Master", name: "Calcul de inalta performanta - engleza", code: "MaCIP", years: [1,2] },
+  { section: "Master", name: "Sisteme informatice avansate - germana/engleza", code: "MaSIA", years: [1,2] },
+  { section: "Master", name: "Stiinta datelor in industrie si societate", code: "MaDataSci", years: [1,2] },
+  { section: "Master", name: "Securitate cibernetica", code: "Cyber", years: [1,2] },
+  { section: "Master", name: "Analiza datelor si modelare - maghiara", code: "ADM", years: [1,2] },
+  { section: "Master", name: "Proiectarea si dezvoltarea aplicatiilor Enterprise", code: "PDAE", years: [1,2] },
+  { section: "Master", name: "IA pentru industrii conectate - engleza", code: "MaAI4CI", years: [1] },
+  { section: "Master", name: "Cloud, retea si HPC - engleza", code: "CNIHPC", years: [1] },
+  { section: "Master", name: "Masterat didactic Informatica - romana", code: "StEduID", years: [1,2] },
+  { section: "Master", name: "Masterat didactic Matematica - maghiara", code: "StEduMDm", years: [1,2] },
+  { section: "Master", name: "Masterat didactic Informatica - maghiara", code: "StEduIDm", years: [1,2] },
+];
 
+// All fetched rows: { pageCode, day, time, freq, room, formatia, type, subject, professor }
+let allRows = [];
+let savedConfig = {};
+
+// ---- Init ----
 document.addEventListener("DOMContentLoaded", () => {
-  chrome.storage.sync.get(
-    ["timetableUrl", "group", "semigroup", "subjects", "selectedWeek"],
-    (result) => {
-      if (result.timetableUrl) {
-        document.getElementById("timetableUrl").value = result.timetableUrl;
-      }
-      if (result.group) {
-        document.getElementById("group").value = result.group;
-      }
-      if (result.semigroup) {
-        document.getElementById("semigroup").value = result.semigroup;
-      }
+  renderCatalog();
 
-      // Set week toggle
-      const week = result.selectedWeek || "all";
-      const radio = document.querySelector(
-        `input[name="week"][value="${week}"]`
-      );
-      if (radio) radio.checked = true;
+  // Collapsible sections
+  document.querySelectorAll("[data-toggle]").forEach((hdr) => {
+    hdr.addEventListener("click", () => hdr.parentElement.classList.toggle("collapsed"));
+  });
 
-      // Auto-load all years if URL is set
-      if (result.timetableUrl) {
-        loadAllYears(result.timetableUrl, result.subjects || []);
-      }
+  chrome.storage.local.get(null, (data) => {
+    savedConfig = data || {};
+    if (data.baseUrl) document.getElementById("baseUrl").value = data.baseUrl;
+    if (data.defaultGroup) document.getElementById("defaultGroup").value = data.defaultGroup;
+    if (data.defaultSemigroup) document.getElementById("defaultSemigroup").value = data.defaultSemigroup;
+    if (data.selectedWeek) {
+      const r = document.querySelector(`input[name="week"][value="${data.selectedWeek}"]`);
+      if (r) r.checked = true;
     }
-  );
-});
-
-// Year tab clicks — toggle year on/off
-document.querySelectorAll(".year-tabs button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const year = btn.dataset.year;
-    if (activeYears.has(year)) {
-      activeYears.delete(year);
-      btn.classList.remove("active");
-    } else {
-      activeYears.add(year);
-      btn.classList.add("active");
-      // Fetch if not cached
-      const baseUrl = document.getElementById("timetableUrl").value.trim();
-      if (baseUrl && !cachedSubjects[year]) {
-        fetchYear(baseUrl, year).then(() => renderCombinedSubjects());
-        return;
-      }
+    // Restore selected pages
+    if (data.selectedPages) {
+      data.selectedPages.forEach((code) => {
+        const cb = document.querySelector(`.catalog-years input[data-code="${code}"]`);
+        if (cb) cb.checked = true;
+      });
     }
-    renderCombinedSubjects();
+    // Restore cached rows so subjects render instantly
+    if (data.cachedRows && data.cachedRows.length > 0) {
+      allRows = data.cachedRows;
+      renderSubjects();
+    }
   });
 });
 
-// Select all / Deselect all
-document.getElementById("selectAll").addEventListener("click", () => {
-  document.querySelectorAll('#subjectList input[type="checkbox"]').forEach((cb) => {
-    cb.checked = true;
-  });
-});
+document.getElementById("loadSubjectsBtn").addEventListener("click", loadSubjects);
+document.getElementById("saveBtn").addEventListener("click", save);
+document.getElementById("applyBtn").addEventListener("click", apply);
 
-document.getElementById("deselectAll").addEventListener("click", () => {
-  document.querySelectorAll('#subjectList input[type="checkbox"]').forEach((cb) => {
-    cb.checked = false;
-  });
-});
-
-function buildYearUrl(baseUrl, year) {
-  return baseUrl.replace(/\/I\d\.html/i, `/I${year}.html`);
-}
-
-async function loadAllYears(baseUrl, savedSubjects) {
-  const container = document.getElementById("subjectList");
-  container.innerHTML = '<div class="subject-loading">Loading subjects...</div>';
-
-  // Set all year buttons to loading
-  document.querySelectorAll(".year-tabs button").forEach((btn) => {
-    btn.classList.add("loading");
-  });
-
-  await Promise.all(YEARS.map((year) => fetchYear(baseUrl, year)));
-
-  // Activate all years by default
-  YEARS.forEach((year) => {
-    if (cachedSubjects[year] && cachedSubjects[year].length > 0) {
-      activeYears.add(year);
-    }
-  });
-  updateYearTabStyles();
-  renderCombinedSubjects(savedSubjects);
-}
-
-async function fetchYear(baseUrl, year) {
-  const btn = document.querySelector(`.year-tabs button[data-year="${year}"]`);
-  try {
-    const url = buildYearUrl(baseUrl, year);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    cachedSubjects[year] = extractSubjects(doc);
-  } catch (err) {
-    console.error(`Failed to fetch year ${year}:`, err);
-    cachedSubjects[year] = [];
-  } finally {
-    if (btn) btn.classList.remove("loading");
-  }
-}
-
-function extractSubjects(doc) {
-  const subjects = new Set();
-  doc.querySelectorAll("table tr").forEach((row) => {
-    if (row.querySelector("th")) return;
-    const cells = row.querySelectorAll("td");
-    if (cells.length > DISCIPLINE_COLUMN_INDEX) {
-      const text = cells[DISCIPLINE_COLUMN_INDEX].textContent.trim();
-      if (text) subjects.add(text);
-    }
-  });
-  return [...subjects].sort((a, b) => a.localeCompare(b, "ro"));
-}
-
-function updateYearTabStyles() {
-  document.querySelectorAll(".year-tabs button").forEach((btn) => {
-    btn.classList.toggle("active", activeYears.has(btn.dataset.year));
-  });
-}
-
-function renderCombinedSubjects(savedSubjects) {
-  const container = document.getElementById("subjectList");
-
-  // If savedSubjects not passed, preserve current checkbox state
-  if (!savedSubjects) {
-    savedSubjects = getSelectedSubjects();
-  }
-
-  // Collect subjects grouped by year, only from active years
-  const yearEntries = [];
-  for (const year of YEARS) {
-    if (!activeYears.has(year)) continue;
-    const subjects = cachedSubjects[year] || [];
-    if (subjects.length > 0) {
-      yearEntries.push({ year, subjects });
-    }
-  }
-
-  if (yearEntries.length === 0) {
-    container.innerHTML = '<div class="subject-empty">Select a year to show subjects</div>';
-    return;
-  }
-
-  const savedLower = savedSubjects.map((s) => s.toLowerCase());
-
+// ---- Catalog Rendering ----
+function renderCatalog() {
+  const container = document.getElementById("catalogList");
+  let currentSection = "";
   let html = "";
-  for (const { year, subjects } of yearEntries) {
-    html += `<div class="year-heading">Anul ${year}</div>`;
-    for (const subject of subjects) {
-      const checked = savedLower.some(
-        (s) => subject.toLowerCase() === s || subject.toLowerCase().includes(s) || s.includes(subject.toLowerCase())
-      );
-      html += `<label>
-        <input type="checkbox" value="${escapeHtml(subject)}" ${checked ? "checked" : ""}>
-        ${escapeHtml(subject)}
-      </label>`;
-    }
-  }
 
+  for (const entry of CATALOG) {
+    if (entry.section !== currentSection) {
+      currentSection = entry.section;
+      html += `<div style="font-weight:700;font-size:11px;color:#888;padding:6px 0 2px;border-bottom:1px solid #eee;text-transform:uppercase">${currentSection}</div>`;
+    }
+    const yearCbs = entry.years
+      .map((y) => {
+        const code = `${entry.code}${y}`;
+        return `<label><input type="checkbox" data-code="${code}"> A${y}</label>`;
+      })
+      .join("");
+    html += `<div class="catalog-item"><span class="catalog-name">${entry.name}</span><span class="catalog-years">${yearCbs}</span></div>`;
+  }
   container.innerHTML = html;
 }
 
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+// ---- Fetching & Parsing ----
+function getSelectedPageCodes() {
+  return [...document.querySelectorAll('.catalog-years input:checked')].map((cb) => cb.dataset.code);
 }
 
-function getSelectedSubjects() {
-  const checkboxes = document.querySelectorAll(
-    '#subjectList input[type="checkbox"]:checked'
-  );
-  return [...checkboxes].map((cb) => cb.value);
-}
+async function loadSubjects() {
+  const baseUrl = document.getElementById("baseUrl").value.trim();
+  if (!baseUrl) { showStatus("Enter a semester base URL first", "error"); return; }
 
-function getSelectedWeek() {
-  const radio = document.querySelector('input[name="week"]:checked');
-  return radio ? radio.value : "all";
-}
+  const codes = getSelectedPageCodes();
+  if (codes.length === 0) { showStatus("Select at least one specialization/year", "error"); return; }
 
-// Save button
-document.getElementById("saveBtn").addEventListener("click", () => {
-  const timetableUrl = document.getElementById("timetableUrl").value.trim();
-  const group = document.getElementById("group").value.trim();
-  const semigroup = document.getElementById("semigroup").value.trim();
-  const subjects = getSelectedSubjects();
-  const selectedWeek = getSelectedWeek();
+  const area = document.getElementById("subjectArea");
+  area.innerHTML = '<div class="empty-msg">Loading...</div>';
+  allRows = [];
 
-  if (!timetableUrl || !isValidUrl(timetableUrl)) {
-    showStatus("Please enter a valid timetable URL", "error");
-    return;
-  }
-
-  if (!group || isNaN(group) || group <= 0) {
-    showStatus("Please enter a valid group number", "error");
-    return;
-  }
-
-  if (semigroup && (isNaN(semigroup) || semigroup < 1 || semigroup > 2)) {
-    showStatus("Semigroup must be 1 or 2", "error");
-    return;
-  }
-
-  chrome.storage.sync.set(
-    { timetableUrl, group, semigroup, subjects, selectedWeek },
-    () => {
-      showStatus("Settings saved successfully!", "success");
+  const fetches = codes.map(async (code) => {
+    try {
+      const url = baseUrl.replace(/\/?$/, "/") + code + ".html";
+      const resp = await fetch(url);
+      if (!resp.ok) return;
+      const html = await resp.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      parseRows(doc, code);
+    } catch (e) {
+      console.error(`Failed to fetch ${code}:`, e);
     }
-  );
-});
+  });
 
-// Apply button
-document.getElementById("applyBtn").addEventListener("click", () => {
-  const timetableUrl = document.getElementById("timetableUrl").value.trim();
-  const group = document.getElementById("group").value.trim();
-  const semigroup = document.getElementById("semigroup").value.trim();
-  const subjects = getSelectedSubjects();
-  const selectedWeek = getSelectedWeek();
+  await Promise.all(fetches);
+  chrome.storage.local.set({ cachedRows: allRows });
+  renderSubjects();
+}
 
-  if (!timetableUrl || !isValidUrl(timetableUrl)) {
-    showStatus("Please enter a valid timetable URL", "error");
+function parseRows(doc, pageCode) {
+  doc.querySelectorAll("table tr").forEach((row) => {
+    if (row.querySelector("th")) return;
+    const cells = row.querySelectorAll("td");
+    if (cells.length < 8) return;
+
+    allRows.push({
+      pageCode,
+      day: cells[COL.DAY].textContent.trim(),
+      time: cells[COL.TIME].textContent.trim(),
+      freq: cells[COL.FREQ].textContent.trim(),
+      room: cells[COL.ROOM].textContent.trim(),
+      formatia: cells[COL.FORMATIA].textContent.trim(),
+      type: cells[COL.TYPE].textContent.trim(),
+      subject: cells[COL.SUBJECT].textContent.trim(),
+      professor: cells[COL.PROF].textContent.trim(),
+    });
+  });
+}
+
+// ---- Subject Rendering ----
+function renderSubjects() {
+  const area = document.getElementById("subjectArea");
+  const defaultGroup = document.getElementById("defaultGroup").value.trim();
+  const defaultSemigroup = document.getElementById("defaultSemigroup").value.trim();
+
+  // Group by subject
+  const subjectMap = new Map(); // subject -> { types: Map<type, row[]>, pageCodes: Set }
+  for (const row of allRows) {
+    if (!row.subject) continue;
+    if (!subjectMap.has(row.subject)) {
+      subjectMap.set(row.subject, { types: new Map(), pageCodes: new Set() });
+    }
+    const entry = subjectMap.get(row.subject);
+    entry.pageCodes.add(row.pageCode);
+    if (!entry.types.has(row.type)) {
+      entry.types.set(row.type, []);
+    }
+    entry.types.get(row.type).push(row);
+  }
+
+  if (subjectMap.size === 0) {
+    area.innerHTML = '<div class="empty-msg">No subjects found</div>';
     return;
   }
 
-  if (!group || isNaN(group) || group <= 0) {
-    showStatus("Please enter a valid group number", "error");
-    return;
-  }
+  const savedSubjects = savedConfig.selectedSubjects || [];
+  const savedOverrides = savedConfig.slotOverrides || {};
 
-  if (semigroup && (isNaN(semigroup) || semigroup < 1 || semigroup > 2)) {
-    showStatus("Semigroup must be 1 or 2", "error");
-    return;
-  }
+  const subjects = [...subjectMap.keys()].sort((a, b) => a.localeCompare(b, "ro"));
+  let html = "";
 
-  chrome.storage.sync.set(
-    { timetableUrl, group, semigroup, subjects, selectedWeek },
-    () => {
-      chrome.tabs.create({ url: timetableUrl }, (tab) => {
-        chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.sendMessage(
-              tabId,
-              { action: "applyFilter" },
-              (response) => {
-                if (
-                  chrome.runtime.lastError ||
-                  !response ||
-                  !response.success
-                ) {
-                  showStatus(
-                    "Failed to apply filter. Please ensure the page is a valid timetable.",
-                    "error"
-                  );
-                } else {
-                  showStatus(
-                    "Timetable opened and filter applied successfully!",
-                    "success"
-                  );
-                }
-              }
-            );
-            chrome.tabs.onUpdated.removeListener(listener);
-          }
-        });
+  for (const subj of subjects) {
+    const { types, pageCodes } = subjectMap.get(subj);
+    const isChecked = savedSubjects.includes(subj);
+    const sourceLabel = [...pageCodes].join(", ");
+    const escapedSubj = escapeAttr(subj);
+
+    html += `<div class="subject-item${isChecked ? " expanded" : ""}" data-subject="${escapedSubj}">`;
+    html += `<div class="subject-header">`;
+    html += `<input type="checkbox" class="subject-cb" value="${escapedSubj}" ${isChecked ? "checked" : ""}>`;
+    html += `<span class="name">${escapeHtml(subj)}</span>`;
+    html += `<span class="source">${escapeHtml(sourceLabel)}</span>`;
+    html += `</div>`;
+    html += `<div class="subject-slots">`;
+
+    // Sort types: Curs first, then Seminar, then Laborator, then others
+    const typeOrder = ["Curs", "Seminar", "Laborator"];
+    const sortedTypes = [...types.keys()].sort((a, b) => {
+      const ia = typeOrder.indexOf(a), ib = typeOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    for (const type of sortedTypes) {
+      const rows = types.get(type);
+      const overrideKey = `${subj}|${type}`;
+      const savedFormatia = savedOverrides[overrideKey];
+
+      html += `<div class="slot-row">`;
+      html += `<span class="type-label">${escapeHtml(type)}</span>`;
+      html += `<select data-subject="${escapedSubj}" data-type="${escapeAttr(type)}">`;
+
+      // Deduplicate by formatia+day+time
+      const seen = new Set();
+      const options = [];
+      for (const r of rows) {
+        const key = `${r.formatia}|${r.day}|${r.time}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        options.push(r);
+      }
+
+      // Sort: put default group matches first
+      options.sort((a, b) => {
+        const aMatch = matchesDefault(a.formatia, defaultGroup, defaultSemigroup);
+        const bMatch = matchesDefault(b.formatia, defaultGroup, defaultSemigroup);
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return a.formatia.localeCompare(b.formatia);
       });
-    }
-  );
-});
 
-function isValidUrl(url) {
-  try {
-    new URL(url);
-    return url.startsWith("http://") || url.startsWith("https://");
-  } catch {
-    return false;
+      for (const opt of options) {
+        const val = escapeAttr(opt.formatia);
+        const label = `${opt.formatia} — ${opt.day} ${opt.time} — ${opt.professor} — ${opt.room}`;
+        const isSelected = savedFormatia
+          ? opt.formatia === savedFormatia
+          : matchesDefault(opt.formatia, defaultGroup, defaultSemigroup);
+        html += `<option value="${val}" ${isSelected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+      }
+
+      html += `</select></div>`;
+    }
+
+    html += `</div></div>`;
   }
+
+  area.innerHTML = html;
+
+  // Toggle expand on subject click
+  area.querySelectorAll(".subject-header").forEach((hdr) => {
+    hdr.addEventListener("click", (e) => {
+      if (e.target.tagName === "INPUT") return;
+      const item = hdr.closest(".subject-item");
+      item.classList.toggle("expanded");
+    });
+  });
+
+  // Auto-expand when checking
+  area.querySelectorAll(".subject-cb").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const item = cb.closest(".subject-item");
+      if (cb.checked) item.classList.add("expanded");
+    });
+  });
 }
 
-function showStatus(message, type) {
-  const status = document.getElementById("status");
-  status.textContent = message;
-  status.className = `status ${type}`;
-  setTimeout(() => {
-    status.className = "status";
-  }, 3000);
+function matchesDefault(formatia, group, semigroup) {
+  if (!group) return false;
+  if (formatia === group) return true;
+  if (semigroup && formatia === `${group}/${semigroup}`) return true;
+  return false;
+}
+
+// ---- Save / Apply ----
+function gatherConfig() {
+  const baseUrl = document.getElementById("baseUrl").value.trim();
+  const defaultGroup = document.getElementById("defaultGroup").value.trim();
+  const defaultSemigroup = document.getElementById("defaultSemigroup").value.trim();
+  const selectedWeek = document.querySelector('input[name="week"]:checked')?.value || "all";
+  const selectedPages = getSelectedPageCodes();
+
+  const selectedSubjects = [];
+  const slotOverrides = {};
+
+  document.querySelectorAll(".subject-cb:checked").forEach((cb) => {
+    const subj = cb.value;
+    selectedSubjects.push(subj);
+
+    // Gather slot selections
+    const item = cb.closest(".subject-item");
+    item.querySelectorAll("select").forEach((sel) => {
+      const type = sel.dataset.type;
+      const formatia = sel.value;
+      if (formatia) {
+        slotOverrides[`${subj}|${type}`] = formatia;
+      }
+    });
+  });
+
+  return { baseUrl, defaultGroup, defaultSemigroup, selectedWeek, selectedPages, selectedSubjects, slotOverrides };
+}
+
+function save() {
+  const config = gatherConfig();
+  chrome.storage.local.set(config, () => {
+    savedConfig = config;
+    showStatus("Settings saved!", "success");
+  });
+}
+
+function apply() {
+  const config = gatherConfig();
+  chrome.storage.local.set(config, () => {
+    savedConfig = config;
+    chrome.tabs.create({ url: chrome.runtime.getURL("timetable.html") });
+  });
+}
+
+// ---- Helpers ----
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escapeAttr(s) {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = `status ${type}`;
+  setTimeout(() => { el.className = "status"; }, 3000);
 }
