@@ -92,6 +92,7 @@ function render() {
     const wantedFormatia = slotOverrides[overrideKey];
 
     if (wantedFormatia) {
+      if (wantedFormatia === "__none__") return false;
       if (row.formatia !== wantedFormatia) return false;
     } else {
       const wholeYearCode = row.pageCode;

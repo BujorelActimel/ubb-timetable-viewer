@@ -217,6 +217,8 @@ function renderSubjects() {
       html += `<div class="slot-row">`;
       html += `<span class="type-label">${escapeHtml(type)}</span>`;
       html += `<select data-subject="${escapedSubj}" data-type="${escapeAttr(type)}">`;
+      const isNone = savedFormatia === "__none__";
+      html += `<option value="__none__" ${isNone ? "selected" : ""}>— None —</option>`;
 
       // Deduplicate by formatia+day+time
       const seen = new Set();
