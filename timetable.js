@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     setActiveWeekButton(config.selectedWeek || "all");
+    updateCursButton();
     await fetchAllPages();
     render();
   });
@@ -22,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("weekAll").addEventListener("click", () => setWeek("all"));
   document.getElementById("week1").addEventListener("click", () => setWeek("1"));
   document.getElementById("week2").addEventListener("click", () => setWeek("2"));
+  document.getElementById("toggleCurs").addEventListener("click", () => toggleCurs());
 });
 
 function setWeek(val) {
@@ -29,6 +31,24 @@ function setWeek(val) {
   chrome.storage.local.set({ selectedWeek: val });
   setActiveWeekButton(val);
   render();
+}
+
+function toggleCurs() {
+  config.hideCurs = !config.hideCurs;
+  chrome.storage.local.set({ hideCurs: config.hideCurs });
+  updateCursButton();
+  render();
+}
+
+function updateCursButton() {
+  const btn = document.getElementById("toggleCurs");
+  if (config.hideCurs) {
+    btn.textContent = "Arată Curs";
+    btn.className = "active";
+  } else {
+    btn.textContent = "Ascunde Curs";
+    btn.className = "";
+  }
 }
 
 function setActiveWeekButton(val) {
@@ -86,6 +106,7 @@ function render() {
   const defaultSemigroup = config.defaultSemigroup || "";
 
   const myRows = allFetchedRows.filter((row) => {
+    if (config.hideCurs && row.type === "Curs") return false;
     if (!selectedSubjects.includes(row.subject)) return false;
 
     const overrideKey = `${row.subject}|${row.type}`;
